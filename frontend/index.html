@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Haven — AI Nanny (MVP)</title>
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Haven — AI Nanny</h1>
+      <p class="tag">Parenting co‑pilot • not a replacement for human supervision</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Create Child Profile</h2>
+        <div class="grid">
+          <label>Name <input id="cname" placeholder="Child name" /></label>
+          <label>Age (years) <input id="cage" type="number" step="0.1" value="4.0" /></label>
+          <label>Language
+            <select id="clang">
+              <option value="en">English</option>
+              <option value="nl">Nederlands</option>
+            </select>
+          </label>
+          <button id="saveChild">Save</button>
+        </div>
+        <p id="childStatus"></p>
+      </section>
+
+      <section class="card">
+        <h2>Suggest Activities</h2>
+        <div class="grid">
+          <label>Minutes <input id="amin" type="number" value="20" /></label>
+          <label>Mode
+            <select id="amode">
+              <option value="solo">Solo</option>
+              <option value="together">Together</option>
+            </select>
+          </label>
+          <button id="suggestAct">Get suggestions</button>
+        </div>
+        <pre id="actOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Generate Story</h2>
+        <div class="grid">
+          <label>Theme
+            <select id="theme"><option>adventure</option></select>
+          </label>
+          <label><input id="bilingual" type="checkbox"/> Bilingual</label>
+          <button id="storyBtn">Generate</button>
+        </div>
+        <pre id="storyOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Start 30-min Session</h2>
+        <button id="sessionBtn">Start Session</button>
+        <pre id="sessionOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Time Saved</h2>
+        <button id="metricsBtn">Refresh</button>
+        <pre id="metricsOut"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <small>© 2025 Haven (demo). Adult supervision required.</small>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

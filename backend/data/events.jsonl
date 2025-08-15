@@ -1,0 +1,6 @@
+{"ts": 1755272565.691204, "kind": "child_add", "payload": {"name": "Gina", "age_years": 4.0, "language": "en", "temperament": "balanced"}}
+{"ts": 1755272575.9613912, "kind": "activities_suggest", "payload": {"minutes": 30, "mode": "solo"}}
+{"ts": 1755272584.381064, "kind": "story", "payload": {"title": "Rainbow Umbrella", "lang": "en"}}
+{"ts": 1755272586.017165, "kind": "session_start", "payload": {"duration": 30}}
+{"ts": 1755272594.7054982, "kind": "session_start", "payload": {"duration": 30}}
+{"ts": 1755272597.973623, "kind": "session_start", "payload": {"duration": 30}}

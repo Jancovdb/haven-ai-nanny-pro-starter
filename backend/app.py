@@ -1,0 +1,318 @@
+import json, random, datetime, os, hashlib, base64, time
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
+from pydantic import BaseModel, Field
+from dateutil.relativedelta import relativedelta
+from authlib.integrations.starlette_client import OAuth
+from starlette.responses import RedirectResponse
+from pywebpush import webpush, WebPushException
+
+from config import ENABLE_GOOGLE, LOCAL_ONLY, RETENTION_DAYS, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_CLAIMS, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER, REDIRECT_URI
+
+# ---------- Models ----------
+class Parent(BaseModel):
+    email: str
+    name: Optional[str] = None
+    org: Optional[str] = None
+
+class Child(BaseModel):
+    name: str
+    age_years: float = Field(ge=0, le=12)
+    language: str = "en"  # 'en' or 'nl'
+    temperament: Optional[str] = "balanced"
+
+class DayPlanRequest(BaseModel):
+    child: Child
+    wake_time: str  # "07:00"
+    available_blocks_min: List[int] = [20, 30, 40]
+    focus: Optional[str] = "calm"  # calm | active | learning
+
+class ActivitySuggestRequest(BaseModel):
+    child: Child
+    minutes: int = 20
+    mode: str = "solo"  # solo | together
+
+class StoryRequest(BaseModel):
+    child: Child
+    theme: str = "adventure"
+    length_min: int = 4
+    bilingual: bool = False
+
+class SessionStartRequest(BaseModel):
+    child: Child
+    duration_min: int = 30
+    goal: str = "engage" # engage | calm | learn
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: Dict[str, str]
+
+# ---------- App ----------
+app = FastAPI(title="Haven AI Nanny — Pro")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+def load_json(path: str):
+    with open(path,"r",encoding="utf-8") as f: return json.load(f)
+
+ACTIVITIES = load_json("content/activities.json")
+ST_EN = load_json("content/stories_en.json")
+ST_NL = load_json("content/stories_nl.json")
+
+DB: Dict[str, Any] = {
+    "parents": [], "children": [], "sessions": [], "time_saved_min": 0,
+    "subscriptions": [], "events_path": "data/events.jsonl", "orgs": {}
+}
+os.makedirs("data", exist_ok=True)
+if not os.path.exists(DB["events_path"]):
+    with open(DB["events_path"],"w") as _f: pass
+
+def log_event(kind: str, payload: Dict[str, Any]):
+    entry = {"ts": time.time(), "kind": kind, "payload": payload}
+    with open(DB["events_path"],"a") as f:
+        f.write(json.dumps(entry)+"\n")
+
+# ---------- Basic endpoints ----------
+@app.post("/signup")
+def signup(parent: Parent):
+    DB["parents"].append(parent.model_dump())
+    log_event("signup", parent.model_dump())
+    return {"ok": True, "parent": parent}
+
+@app.post("/child")
+def add_child(child: Child):
+    DB["children"].append(child.model_dump())
+    log_event("child_add", child.model_dump())
+    return {"ok": True, "child": child}
+
+def plan_block(minutes: int, child: Child, focus: str):
+    lang = child.language if child.language in ACTIVITIES else "en"
+    candidates = [a for a in ACTIVITIES[lang]["solo"] if a["minutes"][0] <= minutes <= a["minutes"][1] and child.age_years >= a["age_min"]]
+    if focus != "active":
+        candidates = [a for a in candidates if a["energy"] != "active"] or candidates
+    if not candidates: candidates = ACTIVITIES[lang]["solo"]
+    a = random.choice(candidates)
+    return {"minutes": minutes, "activity": a["name"], "energy": a["energy"]}
+
+@app.post("/plan/day")
+def plan_day(req: DayPlanRequest):
+    blocks = [{"time": req.wake_time, "title": "Wake-up & check-in"}]
+    t = datetime.datetime.strptime(req.wake_time, "%H:%M")
+    for m in req.available_blocks_min:
+        block = plan_block(m, req.child, req.focus)
+        t_end = t + datetime.timedelta(minutes=m)
+        blocks.append({"start": t.strftime("%H:%M"), "end": t_end.strftime("%H:%M"), "plan": block})
+        t = t_end + datetime.timedelta(minutes=5)
+    log_event("plan_day", {"child": req.child.model_dump(), "blocks": req.available_blocks_min})
+    return {"ok": True, "blocks": blocks, "note": "Adult supervision required."}
+
+@app.post("/activities/suggest")
+def activities_suggest(req: ActivitySuggestRequest):
+    lang = req.child.language if req.child.language in ACTIVITIES else "en"
+    pool = ACTIVITIES[lang][req.mode]
+    out = [a for a in pool if a["minutes"][0] <= req.minutes <= a["minutes"][1] and req.child.age_years >= a["age_min"]]
+    if not out: out = pool
+    log_event("activities_suggest", {"minutes": req.minutes, "mode": req.mode})
+    return {"ok": True, "suggestions": out[:5]}
+
+@app.post("/story/generate")
+def story_generate(req: StoryRequest):
+    lang = req.child.language
+    seeds = ST_NL if lang == "nl" else ST_EN
+    seed = random.choice(seeds)
+    child_name = req.child.name or ("je kind" if lang=="nl" else "your child")
+    story = seed["template"].format(child=child_name)
+    if req.bilingual:
+        if lang == "nl":
+            alt = random.choice(ST_EN)["template"].format(child=child_name); story += "\n\n[English] " + alt
+        else:
+            alt = random.choice(ST_NL)["template"].format(child=child_name); story += "\n\n[Nederlands] " + alt
+    log_event("story", {"title": seed["title"], "lang": lang})
+    return {"ok": True, "title": seed["title"], "story": story}
+
+@app.post("/session/start")
+def session_start(req: SessionStartRequest):
+    flow = [
+        {"phase":"warmup","minutes":5,"action":"calm breathing + choose mascot plush"},
+        {"phase":"core","minutes":max(5, req.duration_min-10),"action":"guided solo activity"},
+        {"phase":"winddown","minutes":5,"action":"short story + tidy-up song"}
+    ]
+    DB["sessions"].append({"child": req.child.model_dump(), "duration": req.duration_min})
+    DB["time_saved_min"] += req.duration_min
+    log_event("session_start", {"duration": req.duration_min})
+    return {"ok": True, "flow": flow, "safety":"Adult must be reachable at all times."}
+
+@app.get("/metrics/timesaved")
+def metrics_timesaved():
+    return {"ok": True, "minutes_saved_total": DB["time_saved_min"], "sessions": len(DB["sessions"])}
+
+# ---------- Calendar (.ics) ----------
+from pydantic import BaseModel
+class ICSRequest(BaseModel):
+    child: Child
+    date: str  # YYYY-MM-DD
+    plan: List[Dict[str, Any]]
+
+def ics_escape(s:str)->str:
+    return s.replace(",", r"\,").replace(";", r"\;")
+
+from fastapi.responses import PlainTextResponse
+@app.post("/integrations/calendar/ics")
+def make_ics(req: ICSRequest):
+    lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Haven//AI Nanny//EN"]
+    for item in req.plan:
+        title = item.get("plan",{}).get("activity","Haven Activity")
+        start = item.get("start"); end = item.get("end")
+        if not (start and end): continue
+        dt = datetime.datetime.strptime(req.date+" "+start, "%Y-%m-%d %H:%M")
+        dt_end = datetime.datetime.strptime(req.date+" "+end, "%Y-%m-%d %H:%M")
+        uid = hashlib.sha1(f"{req.child.name}{dt}".encode()).hexdigest()+"@haven"
+        lines += ["BEGIN:VEVENT",
+                  f"UID:{uid}",
+                  f"DTSTAMP:{datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+                  f"DTSTART:{dt.strftime('%Y%m%dT%H%M%S')}",
+                  f"DTEND:{dt_end.strftime('%Y%m%dT%H%M%S')}",
+                  f"SUMMARY:{ics_escape(title)}",
+                  "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    return PlainTextResponse("\\r\\n".join(lines), media_type="text/calendar")
+
+# ---------- Web Push ----------
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: Dict[str, str]
+
+@app.get("/notifications/publickey")
+def publickey():
+    return {"key": VAPID_PUBLIC_KEY}
+
+@app.post("/notifications/register")
+def notifications_register(sub: PushSubscription):
+    subs_path = "data/subscriptions.json"
+    try:
+        data = json.load(open(subs_path,"r"))
+    except Exception:
+        data = []
+    if not any(s.get("endpoint")==sub.endpoint for s in data):
+        data.append(sub.model_dump())
+        json.dump(data, open(subs_path,"w"))
+    log_event("push_register", {"count": len(data)})
+    return {"ok": True, "registered": len(data)}
+
+from pydantic import BaseModel
+class PushMessage(BaseModel):
+    title: str
+    body: str
+
+@app.post("/notifications/test")
+def notifications_test(msg: PushMessage):
+    subs_path = "data/subscriptions.json"
+    if not os.path.exists(subs_path): 
+        raise HTTPException(400,"No subscriptions")
+    subs = json.load(open(subs_path,"r"))
+    sent = 0
+    for s in subs:
+        try:
+            webpush(subscription_info=s, data=json.dumps({"title": msg.title, "body": msg.body}),
+                    vapid_private_key=VAPID_PRIVATE_KEY, vapid_claims=VAPID_CLAIMS)
+            sent += 1
+        except WebPushException:
+            continue
+    log_event("push_send", {"attempted": len(subs), "sent": sent})
+    return {"ok": True, "sent": sent}
+
+# ---------- Privacy Controls ----------
+@app.get("/privacy/export")
+def privacy_export():
+    bundle = {"parents": DB["parents"], "children": DB["children"], "sessions": DB["sessions"]}
+    return bundle
+
+@app.delete("/privacy/child/{name}")
+def privacy_delete_child(name: str):
+    before = len(DB["children"])
+    DB["children"] = [c for c in DB["children"] if c.get("name") != name]
+    after = len(DB["children"])
+    log_event("child_delete", {"name": name})
+    return {"ok": True, "removed": before - after}
+
+@app.delete("/privacy/wipe")
+def privacy_wipe():
+    DB["children"].clear(); DB["parents"].clear(); DB["sessions"].clear(); DB["time_saved_min"] = 0
+    log_event("wipe", {}); 
+    return {"ok": True}
+
+@app.post("/privacy/maintenance")
+def privacy_maintenance():
+    cutoff = time.time() - (RETENTION_DAYS*24*3600)
+    path = DB["events_path"]
+    if not os.path.exists(path): return {"ok": True, "pruned": 0}
+    kept = []
+    with open(path) as f:
+        for line in f:
+            try:
+                item = json.loads(line); 
+                if item.get("ts",0) >= cutoff: kept.append(line)
+            except: pass
+    with open(path,"w") as f:
+        for line in kept: f.write(line)
+    return {"ok": True, "kept": len(kept)}
+
+# ---------- Employer / SSO Scaffold ----------
+class Org(BaseModel):
+    org_id: str
+    name: str
+    domain: Optional[str] = None
+
+@app.post("/admin/orgs")
+def create_org(org: Org):
+    DB["orgs"][org.org_id] = org.model_dump()
+    log_event("org_create", org.model_dump())
+    return {"ok": True, "orgs": list(DB["orgs"].values())}
+
+@app.get("/admin/metrics/aggregate")
+def admin_metrics():
+    return {
+        "sessions": len(DB["sessions"]),
+        "minutes_saved_total": DB["time_saved_min"],
+        "children": len(DB["children"]),
+        "parents": len(DB["parents"]),
+    }
+
+@app.get("/sso/mock/login")
+def sso_mock_login(email: str = "user@example.com", org_id: str = "demo"):
+    DB["parents"].append({"email": email, "name": "Mock User", "org": org_id})
+    log_event("sso_mock", {"email": email, "org": org_id})
+    return {"ok": True, "email": email, "org": org_id}
+
+# OAuth scaffold (disabled by default)
+oauth = OAuth()
+if ENABLE_GOOGLE:
+    oauth.register(
+        name="google",
+        client_id=OIDC_CLIENT_ID,
+        client_secret=OIDC_CLIENT_SECRET,
+        server_metadata_url=f"{OIDC_ISSUER}/.well-known/openid-configuration",
+        client_kwargs={"scope":"openid email profile"}
+    )
+
+@app.get("/integrations/google/auth-url")
+def google_auth_url():
+    if not ENABLE_GOOGLE: 
+        return {"ok": False, "message":"Google integration disabled; set ENABLE_GOOGLE=True in config.py"}
+    return {"ok": True, "auth_url": "/integrations/google/login"}  # stub for local
+
+@app.get("/integrations/google/login")
+async def google_login(request: Request):
+    if not ENABLE_GOOGLE: raise HTTPException(400,"Disabled")
+    redirect_uri = REDIRECT_URI
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/integrations/google/callback")
+async def google_callback(request: Request):
+    if not ENABLE_GOOGLE: raise HTTPException(400,"Disabled")
+    token = await oauth.google.authorize_access_token(request)
+    user = token.get("userinfo", {})
+    DB["parents"].append({"email": user.get("email"), "name": user.get("name")})
+    log_event("sso_google", {"email": user.get("email")})
+    return RedirectResponse(url="/")

@@ -1,0 +1,176 @@
+{
+  "en": {
+    "solo": [
+      {
+        "name": "Sticker sorting",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 2
+      },
+      {
+        "name": "Puzzle time",
+        "minutes": [
+          15,
+          30
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Scavenger hunt (indoor)",
+        "minutes": [
+          15,
+          25
+        ],
+        "energy": "active",
+        "age_min": 4
+      },
+      {
+        "name": "Duplo build prompt",
+        "minutes": [
+          20,
+          40
+        ],
+        "energy": "balanced",
+        "age_min": 2
+      },
+      {
+        "name": "Quiet reading nook",
+        "minutes": [
+          10,
+          30
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Color-by-shapes",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 3
+      }
+    ],
+    "together": [
+      {
+        "name": "Kitchen science (baking soda + vinegar)",
+        "minutes": [
+          15,
+          25
+        ],
+        "energy": "active",
+        "age_min": 4
+      },
+      {
+        "name": "Shadow puppets",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Dance freeze",
+        "minutes": [
+          10,
+          15
+        ],
+        "energy": "active",
+        "age_min": 3
+      }
+    ]
+  },
+  "nl": {
+    "solo": [
+      {
+        "name": "Sticker sorteren",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 2
+      },
+      {
+        "name": "Puzzeltijd",
+        "minutes": [
+          15,
+          30
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Binnen speurtocht",
+        "minutes": [
+          15,
+          25
+        ],
+        "energy": "active",
+        "age_min": 4
+      },
+      {
+        "name": "Duplo bouwen",
+        "minutes": [
+          20,
+          40
+        ],
+        "energy": "balanced",
+        "age_min": 2
+      },
+      {
+        "name": "Stille leestent",
+        "minutes": [
+          10,
+          30
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Kleuren op vormen",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 3
+      }
+    ],
+    "together": [
+      {
+        "name": "Keukenproefje",
+        "minutes": [
+          15,
+          25
+        ],
+        "energy": "active",
+        "age_min": 4
+      },
+      {
+        "name": "Schaduwspel",
+        "minutes": [
+          10,
+          20
+        ],
+        "energy": "calm",
+        "age_min": 3
+      },
+      {
+        "name": "Dans & stop",
+        "minutes": [
+          10,
+          15
+        ],
+        "energy": "active",
+        "age_min": 3
+      }
+    ]
+  }
+}
