@@ -54,3 +54,4 @@ Open `frontend/index.html` and keep `API_BASE` pointing at your backend.
 - Replace placeholders in `backend/config.py` (VAPID keys, OIDC secrets).
 - Use HTTPS in production; configure CORS to allowed origins.
 - Run a security review before any real user data.
+# haven-ai-nanny-pro-starter
