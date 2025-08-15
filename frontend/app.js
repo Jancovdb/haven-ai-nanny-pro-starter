@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://haven-ai-nanny-pro-starter.onrender.com";
 
 let child = {name:"Ava", age_years:4.0, language:"en", temperament:"balanced"};
 
