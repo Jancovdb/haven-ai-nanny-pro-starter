@@ -69,6 +69,18 @@
       </section>
     </main>
 
+<section class="card">
+  <h2>Export Day Plan to Calendar (.ics)</h2>
+  <div class="grid">
+    <label>Wake time (HH:MM) <input id="wakeTime" value="07:00" /></label>
+    <label>Blocks (minutes, comma-separated) <input id="blocks" value="20,30,40" /></label>
+    <label>Date (YYYY-MM-DD) <input id="planDate" /></label>
+    <button id="exportICS">Create & Download .ics</button>
+  </div>
+  <small>The plan uses your saved child profile. Adult supervision required.</small>
+  <pre id="icsStatus"></pre>
+</section>
+    
     <footer>
       <small>© 2025 Haven (demo). Adult supervision required.</small>
     </footer>
