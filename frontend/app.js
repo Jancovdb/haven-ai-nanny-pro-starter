@@ -97,3 +97,25 @@ document.getElementById('exportICS').onclick = async () => {
 
   status.textContent = "Downloaded .ics! Import it into your calendar.";
 };
+
+async function ensureNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission !== 'denied') {
+    const perm = await Notification.requestPermission();
+    return perm === 'granted';
+  }
+  return false;
+}
+
+document.getElementById('notifyLocal').onclick = async () => {
+  const ok = await ensureNotifPermission();
+  const status = document.getElementById('notifyStatus');
+  if (!ok) { status.textContent = "Notification permission denied."; return; }
+  const mins = parseInt(document.getElementById('reminderMins').value || "10", 10);
+  const ms = Math.max(0, mins) * 60 * 1000;
+  status.textContent = `Reminder set for ${mins} minute(s).`;
+  setTimeout(() => {
+    new Notification("Haven", { body: "Session starting now! 🎈" });
+  }, ms);
+};
