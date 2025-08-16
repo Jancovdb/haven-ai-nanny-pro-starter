@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from authlib.integrations.starlette_client import OAuth
 from starlette.responses import RedirectResponse
 from pywebpush import webpush, WebPushException
+from typing import List, Dict, Any, Optional
 
 from config import ENABLE_GOOGLE, LOCAL_ONLY, RETENTION_DAYS, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_CLAIMS, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER, REDIRECT_URI
 
