@@ -70,6 +70,16 @@
     </main>
 
 <section class="card">
+  <h2>Session Reminder</h2>
+  <div class="grid">
+    <label>Starts in (minutes) <input id="reminderMins" type="number" value="10"/></label>
+    <button id="notifyLocal">Schedule Local Reminder</button>
+  </div>
+  <small>Uses your browser’s notification permission (no server needed).</small>
+  <pre id="notifyStatus"></pre>
+</section>
+    
+<section class="card">
   <h2>Export Day Plan to Calendar (.ics)</h2>
   <div class="grid">
     <label>Wake time (HH:MM) <input id="wakeTime" value="07:00" /></label>
