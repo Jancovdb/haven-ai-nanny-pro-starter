@@ -119,3 +119,45 @@ document.getElementById('notifyLocal').onclick = async () => {
     new Notification("Haven", { body: "Session starting now! 🎈" });
   }, ms);
 };
+
+let napTimer = null, napEndTs = null;
+
+function formatHMS(ms) {
+  const total = Math.max(0, Math.floor(ms/1000));
+  const h = String(Math.floor(total/3600)).padStart(2,'0');
+  const m = String(Math.floor((total%3600)/60)).padStart(2,'0');
+  const s = String(total%60).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+function tickNap() {
+  if (!napEndTs) return;
+  const left = napEndTs - Date.now();
+  const disp = document.getElementById('napDisplay');
+  disp.textContent = formatHMS(left);
+  if (left <= 0) {
+    clearInterval(napTimer); napTimer = null; napEndTs = null;
+    disp.textContent = "00:00:00";
+    const snd = document.getElementById('napSound'); snd.currentTime = 0; snd.play().catch(()=>{});
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification("Haven", { body: "Nap time finished 🌤️" });
+    }
+  }
+}
+
+document.getElementById('napStart').onclick = async () => {
+  const mins = parseInt(document.getElementById('napMins').value || "30", 10);
+  napEndTs = Date.now() + Math.max(0, mins)*60*1000;
+  if ('Notification' in window && Notification.permission !== 'granted') {
+    await Notification.requestPermission().catch(()=>{});
+  }
+  if (napTimer) clearInterval(napTimer);
+  napTimer = setInterval(tickNap, 250);
+  tickNap();
+};
+
+document.getElementById('napStop').onclick = () => {
+  if (napTimer) clearInterval(napTimer);
+  napTimer = null; napEndTs = null;
+  document.getElementById('napDisplay').textContent = "00:00:00";
+};
