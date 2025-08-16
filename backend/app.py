@@ -87,7 +87,104 @@ try:
 except Exception:
     pass
 
-# ---------- Meal Planner ----------
+def _pick(lst, i):
+    # deterministic rotate
+    return lst[i % len(lst)]
+
+def _merge_ingredients(base: Dict[str, float], extra: Dict[str, float]):
+    out = base.copy()
+    for k, v in extra.items():
+        out[k] = out.get(k, 0) + v
+    return out
+
+def _scale_for_age(ingredients: Dict[str, float], age_years: float) -> Dict[str, float]:
+    # simple scaling: 0.5x for <=2y, 0.75x for <=4y, 1.0x otherwise
+    if age_years <= 2: factor = 0.5
+    elif age_years <= 4: factor = 0.75
+    else: factor = 1.0
+    return {k: round(v * factor, 2) for k, v in ingredients.items()}
+
+from pydantic import BaseModel
+class MealPlanRequest(BaseModel):
+    child: Dict[str, Any]
+    days: int = 7
+    budget: str = "mid"  # low | mid | high
+
+@app.post("/mealplan/generate")
+def mealplan_generate(req: MealPlanRequest):
+    budget = req.budget.lower()
+    if budget not in ("low","mid","high"):
+        budget = "mid"
+    days = max(1, min(14, req.days))
+    age = float(req.child.get("age_years", 4.0))
+
+    plan = []
+    grocery: Dict[str, float] = {}
+    grocery_links: Dict[str, list] = {}  # ingredient -> [recipe labels]
+
+    def link_ingredient(ing_name: str, recipe_label: str):
+        grocery_links.setdefault(ing_name, [])
+        if recipe_label not in grocery_links[ing_name]:
+            grocery_links[ing_name].append(recipe_label)
+
+    def assemble(label_prefix: str, item: dict):
+        base = item["ingredients"]
+        extras = item["budget"].get(budget, {})
+        merged = _merge_ingredients(base, extras)
+        ing = _scale_for_age(merged, age)
+        recipe_label = f"Day {label_prefix} — {item['name']}"
+        # collect totals + link each ingredient to this recipe
+        for k, v in ing.items():
+            grocery[k] = round(grocery.get(k, 0) + v, 2)
+            link_ingredient(k, recipe_label)
+        return {
+            "name": item["name"],
+            "ingredients": ing,
+            "prep_time_min": item.get("prep_time_min"),
+            "instructions": item.get("instructions", []),
+            "notes": item.get("notes", "")
+        }
+
+    for d in range(days):
+        b = _pick(MEAL_DB["breakfast"], d)
+        l = _pick(MEAL_DB["lunch"], d)
+        s = _pick(MEAL_DB["snack"], d)
+        dn = _pick(MEAL_DB["dinner"], d)
+
+        day_num = d + 1
+        day_plan = {
+            "day": day_num,
+            "breakfast": assemble(f"{day_num} Breakfast", b),
+            "lunch":     assemble(f"{day_num} Lunch",     l),
+            "snack":     assemble(f"{day_num} Snack",     s),
+            "dinner":    assemble(f"{day_num} Dinner",    dn),
+        }
+        plan.append(day_plan)
+
+    return {
+        "ok": True,
+        "days": days,
+        "budget": budget,
+        "plan": plan,
+        "grocery_list": grocery,
+        "grocery_links": grocery_links  # NEW: which recipes use each ingredient
+    }
+        plan.append(day_plan)
+
+    return {"ok": True, "days": days, "budget": budget, "plan": plan, "grocery_list": grocery}
+
+class GroceryDownloadRequest(BaseModel):
+    grocery_list: Dict[str, float]
+
+@app.post("/mealplan/groceries.txt")
+def mealplan_groceries_txt(req: GroceryDownloadRequest):
+    lines = ["Haven Grocery List"]
+    for k, v in sorted(req.grocery_list.items()):
+        lines.append(f"- {k}: {v}")
+    text = "\n".join(lines)
+    return PlainTextResponse(text, media_type="text/plain")
+
+    # ---------- Meal Planner ----------
 MEAL_DB = {
     "breakfast": [
         {
@@ -196,103 +293,6 @@ MEAL_DB = {
     ]
 }
 
-def _pick(lst, i):
-    # deterministic rotate
-    return lst[i % len(lst)]
-
-def _merge_ingredients(base: Dict[str, float], extra: Dict[str, float]):
-    out = base.copy()
-    for k, v in extra.items():
-        out[k] = out.get(k, 0) + v
-    return out
-
-def _scale_for_age(ingredients: Dict[str, float], age_years: float) -> Dict[str, float]:
-    # simple scaling: 0.5x for <=2y, 0.75x for <=4y, 1.0x otherwise
-    if age_years <= 2: factor = 0.5
-    elif age_years <= 4: factor = 0.75
-    else: factor = 1.0
-    return {k: round(v * factor, 2) for k, v in ingredients.items()}
-
-from pydantic import BaseModel
-class MealPlanRequest(BaseModel):
-    child: Dict[str, Any]
-    days: int = 7
-    budget: str = "mid"  # low | mid | high
-
-@app.post("/mealplan/generate")
-def mealplan_generate(req: MealPlanRequest):
-    budget = req.budget.lower()
-    if budget not in ("low","mid","high"):
-        budget = "mid"
-    days = max(1, min(14, req.days))
-    age = float(req.child.get("age_years", 4.0))
-
-    plan = []
-    grocery: Dict[str, float] = {}
-    grocery_links: Dict[str, list] = {}  # ingredient -> [recipe labels]
-
-    def link_ingredient(ing_name: str, recipe_label: str):
-        grocery_links.setdefault(ing_name, [])
-        if recipe_label not in grocery_links[ing_name]:
-            grocery_links[ing_name].append(recipe_label)
-
-    def assemble(label_prefix: str, item: dict):
-        base = item["ingredients"]
-        extras = item["budget"].get(budget, {})
-        merged = _merge_ingredients(base, extras)
-        ing = _scale_for_age(merged, age)
-        recipe_label = f"Day {label_prefix} — {item['name']}"
-        # collect totals + link each ingredient to this recipe
-        for k, v in ing.items():
-            grocery[k] = round(grocery.get(k, 0) + v, 2)
-            link_ingredient(k, recipe_label)
-        return {
-            "name": item["name"],
-            "ingredients": ing,
-            "prep_time_min": item.get("prep_time_min"),
-            "instructions": item.get("instructions", []),
-            "notes": item.get("notes", "")
-        }
-
-    for d in range(days):
-        b = _pick(MEAL_DB["breakfast"], d)
-        l = _pick(MEAL_DB["lunch"], d)
-        s = _pick(MEAL_DB["snack"], d)
-        dn = _pick(MEAL_DB["dinner"], d)
-
-        day_num = d + 1
-        day_plan = {
-            "day": day_num,
-            "breakfast": assemble(f"{day_num} Breakfast", b),
-            "lunch":     assemble(f"{day_num} Lunch",     l),
-            "snack":     assemble(f"{day_num} Snack",     s),
-            "dinner":    assemble(f"{day_num} Dinner",    dn),
-        }
-        plan.append(day_plan)
-
-    return {
-        "ok": True,
-        "days": days,
-        "budget": budget,
-        "plan": plan,
-        "grocery_list": grocery,
-        "grocery_links": grocery_links  # NEW: which recipes use each ingredient
-    }
-        plan.append(day_plan)
-
-    return {"ok": True, "days": days, "budget": budget, "plan": plan, "grocery_list": grocery}
-
-class GroceryDownloadRequest(BaseModel):
-    grocery_list: Dict[str, float]
-
-@app.post("/mealplan/groceries.txt")
-def mealplan_groceries_txt(req: GroceryDownloadRequest):
-    lines = ["Haven Grocery List"]
-    for k, v in sorted(req.grocery_list.items()):
-        lines.append(f"- {k}: {v}")
-    text = "\n".join(lines)
-    return PlainTextResponse(text, media_type="text/plain")
-    
 # ---------- Basic endpoints ----------
 @app.post("/signup")
 def signup(parent: Parent):
