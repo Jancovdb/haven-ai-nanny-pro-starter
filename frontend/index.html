@@ -13,12 +13,10 @@
     </header>
 
     <main>
-      <section class="card">
+  <section class="card">
   <h2>Meal Plan & Groceries</h2>
   <div class="grid">
-    <label>Days
-      <input id="mp_days" type="number" value="7" min="1" max="14"/>
-    </label>
+    <label>Days <input id="mp_days" type="number" value="7" min="1" max="14"/></label>
     <label>Budget
       <select id="mp_budget">
         <option value="low">Low</option>
@@ -29,7 +27,18 @@
     <button id="mp_generate">Generate Plan</button>
     <button id="mp_download">Download Groceries (.txt)</button>
   </div>
-  <pre id="mp_out"></pre>
+
+  <h3>Weekly Plan</h3>
+  <div id="mp_days_view" style="white-space:pre-wrap;"></div>
+
+  <h3>Groceries</h3>
+  <div id="mp_grocery_view" style="white-space:pre-wrap;"></div>
+
+  <h3>Recipe Details</h3>
+  <label>Choose recipe
+    <select id="mp_recipe_select"></select>
+  </label>
+  <pre id="mp_recipe_out"></pre>
 </section>
       
       <section class="card">
