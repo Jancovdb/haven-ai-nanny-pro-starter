@@ -87,6 +87,131 @@ try:
 except Exception:
     pass
 
+# ---------- Meal Planner ----------
+
+# Simple kid-friendly recipe bank with budget variants
+MEAL_DB = {
+    "breakfast": [
+        {
+            "name": "Oatmeal with banana",
+            "ingredients": {"rolled oats (g)": 40, "milk or alt (ml)": 200, "banana": 0.5, "honey (tsp)": 1},
+            "budget": {"low": {}, "mid": {"honey (tsp)": 1}, "high": {"berries (g)": 30}}
+        },
+        {
+            "name": "Yogurt & granola cup",
+            "ingredients": {"plain yogurt (g)": 150, "granola (g)": 30, "apple": 0.5},
+            "budget": {"low": {}, "mid": {"granola (g)": 35}, "high": {"berries (g)": 40, "honey (tsp)": 1}}
+        }
+    ],
+    "lunch": [
+        {
+            "name": "Turkey & cheese sandwich",
+            "ingredients": {"wholegrain bread (slices)": 2, "turkey slices": 2, "cheese slice": 1, "cucumber (slices)": 4},
+            "budget": {"low": {"cheese slice": 0.5}, "mid": {}, "high": {"tomato (slices)": 2, "spinach handful": 1}}
+        },
+        {
+            "name": "Veggie pasta",
+            "ingredients": {"pasta (g)": 60, "tomato sauce (g)": 120, "frozen veggies (g)": 60},
+            "budget": {"low": {}, "mid": {"parmesan (tbsp)": 1}, "high": {"olive oil (tsp)": 1, "fresh basil (leaves)": 3}}
+        }
+    ],
+    "snack": [
+        {
+            "name": "Carrot sticks & hummus",
+            "ingredients": {"carrot": 0.5, "hummus (tbsp)": 2},
+            "budget": {"low": {}, "mid": {}, "high": {"cucumber (sticks)": 4}}
+        },
+        {
+            "name": "Apple slices & peanut butter",
+            "ingredients": {"apple": 0.5, "peanut butter (tbsp)": 1},
+            "budget": {"low": {}, "mid": {}, "high": {"raisins (tbsp)": 1}}
+        }
+    ],
+    "dinner": [
+        {
+            "name": "Chicken, rice & broccoli",
+            "ingredients": {"chicken (g)": 70, "rice (g)": 50, "broccoli (g)": 60},
+            "budget": {"low": {}, "mid": {"soy sauce (tsp)": 1}, "high": {"sesame oil (tsp)": 0.5}}
+        },
+        {
+            "name": "Mild veggie chili",
+            "ingredients": {"kidney beans (g)": 80, "sweetcorn (g)": 40, "tomato passata (g)": 120, "rice (g)": 50},
+            "budget": {"low": {}, "mid": {"cheddar (tbsp)": 1}, "high": {"avocado": 0.25}}
+        }
+    ]
+}
+
+def _pick(lst, i):
+    # deterministic rotate
+    return lst[i % len(lst)]
+
+def _merge_ingredients(base: Dict[str, float], extra: Dict[str, float]):
+    out = base.copy()
+    for k, v in extra.items():
+        out[k] = out.get(k, 0) + v
+    return out
+
+def _scale_for_age(ingredients: Dict[str, float], age_years: float) -> Dict[str, float]:
+    # simple scaling: 0.5x for <=2y, 0.75x for <=4y, 1.0x otherwise
+    if age_years <= 2: factor = 0.5
+    elif age_years <= 4: factor = 0.75
+    else: factor = 1.0
+    return {k: round(v * factor, 2) for k, v in ingredients.items()}
+
+from pydantic import BaseModel
+class MealPlanRequest(BaseModel):
+    child: Dict[str, Any]
+    days: int = 7
+    budget: str = "mid"  # low | mid | high
+
+@app.post("/mealplan/generate")
+def mealplan_generate(req: MealPlanRequest):
+    budget = req.budget.lower()
+    if budget not in ("low","mid","high"):
+        budget = "mid"
+    days = max(1, min(14, req.days))
+    age = float(req.child.get("age_years", 4.0))
+
+    plan = []
+    grocery: Dict[str, float] = {}
+
+    for d in range(days):
+        b = _pick(MEAL_DB["breakfast"], d)
+        l = _pick(MEAL_DB["lunch"], d)
+        s = _pick(MEAL_DB["snack"], d)
+        dn = _pick(MEAL_DB["dinner"], d)
+
+        def assemble(item):
+            base = item["ingredients"]
+            extras = item["budget"].get(budget, {})
+            ing = _scale_for_age(_merge_ingredients(base, extras), age)
+            # collect
+            for k, v in ing.items():
+                grocery[k] = round(grocery.get(k, 0) + v, 2)
+            return {"name": item["name"], "ingredients": ing}
+
+        day_plan = {
+            "day": d+1,
+            "breakfast": assemble(b),
+            "lunch": assemble(l),
+            "snack": assemble(s),
+            "dinner": assemble(dn)
+        }
+        plan.append(day_plan)
+
+    return {"ok": True, "days": days, "budget": budget, "plan": plan, "grocery_list": grocery}
+
+class GroceryDownloadRequest(BaseModel):
+    grocery_list: Dict[str, float]
+
+@app.post("/mealplan/groceries.txt")
+def mealplan_groceries_txt(req: GroceryDownloadRequest):
+    lines = ["Haven Grocery List"]
+    for k, v in sorted(req.grocery_list.items()):
+        lines.append(f"- {k}: {v}")
+    text = "\n".join(lines)
+    return PlainTextResponse(text, media_type="text/plain")
+    
 # ---------- Basic endpoints ----------
 @app.post("/signup")
 def signup(parent: Parent):
