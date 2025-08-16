@@ -88,55 +88,110 @@ except Exception:
     pass
 
 # ---------- Meal Planner ----------
-
-# Simple kid-friendly recipe bank with budget variants
 MEAL_DB = {
     "breakfast": [
         {
             "name": "Oatmeal with banana",
             "ingredients": {"rolled oats (g)": 40, "milk or alt (ml)": 200, "banana": 0.5, "honey (tsp)": 1},
-            "budget": {"low": {}, "mid": {"honey (tsp)": 1}, "high": {"berries (g)": 30}}
+            "budget": {"low": {}, "mid": {"honey (tsp)": 1}, "high": {"berries (g)": 30}},
+            "prep_time_min": 6,
+            "instructions": [
+                "Heat milk in a small pot until steaming (do not boil).",
+                "Stir in oats; simmer 3–4 minutes until thick.",
+                "Slice banana; top oatmeal with banana and honey.",
+                "High budget: add berries on top."
+            ],
+            "notes": "Use water for lighter oatmeal. Cool before serving young children."
         },
         {
             "name": "Yogurt & granola cup",
             "ingredients": {"plain yogurt (g)": 150, "granola (g)": 30, "apple": 0.5},
-            "budget": {"low": {}, "mid": {"granola (g)": 35}, "high": {"berries (g)": 40, "honey (tsp)": 1}}
+            "budget": {"low": {}, "mid": {"granola (g)": 35}, "high": {"berries (g)": 40, "honey (tsp)": 1}},
+            "prep_time_min": 4,
+            "instructions": [
+                "Layer yogurt in a cup or bowl.",
+                "Top with granola and chopped apple.",
+                "High budget: add berries and a drizzle of honey."
+            ],
+            "notes": "Use low‑sugar granola for kids."
         }
     ],
     "lunch": [
         {
             "name": "Turkey & cheese sandwich",
             "ingredients": {"wholegrain bread (slices)": 2, "turkey slices": 2, "cheese slice": 1, "cucumber (slices)": 4},
-            "budget": {"low": {"cheese slice": 0.5}, "mid": {}, "high": {"tomato (slices)": 2, "spinach handful": 1}}
+            "budget": {"low": {"cheese slice": 0.5}, "mid": {}, "high": {"tomato (slices)": 2, "spinach handful": 1}},
+            "prep_time_min": 5,
+            "instructions": [
+                "Layer turkey and cheese between bread.",
+                "Add cucumber; high budget: add tomato and spinach.",
+                "Cut into small squares or triangles."
+            ],
+            "notes": "Swap turkey for hummus for a veggie option."
         },
         {
             "name": "Veggie pasta",
             "ingredients": {"pasta (g)": 60, "tomato sauce (g)": 120, "frozen veggies (g)": 60},
-            "budget": {"low": {}, "mid": {"parmesan (tbsp)": 1}, "high": {"olive oil (tsp)": 1, "fresh basil (leaves)": 3}}
+            "budget": {"low": {}, "mid": {"parmesan (tbsp)": 1}, "high": {"olive oil (tsp)": 1, "fresh basil (leaves)": 3}},
+            "prep_time_min": 15,
+            "instructions": [
+                "Boil pasta in salted water until tender.",
+                "Warm sauce with frozen veggies in a pan.",
+                "Stir pasta into sauce.",
+                "Mid: sprinkle parmesan. High: add olive oil and basil."
+            ],
+            "notes": "Use small pasta shapes for toddlers."
         }
     ],
     "snack": [
         {
             "name": "Carrot sticks & hummus",
             "ingredients": {"carrot": 0.5, "hummus (tbsp)": 2},
-            "budget": {"low": {}, "mid": {}, "high": {"cucumber (sticks)": 4}}
+            "budget": {"low": {}, "mid": {}, "high": {"cucumber (sticks)": 4}},
+            "prep_time_min": 3,
+            "instructions": [
+                "Cut carrot into sticks.",
+                "Serve with hummus. High budget: add cucumber sticks."
+            ],
+            "notes": "Steam carrots briefly for very young children."
         },
         {
             "name": "Apple slices & peanut butter",
             "ingredients": {"apple": 0.5, "peanut butter (tbsp)": 1},
-            "budget": {"low": {}, "mid": {}, "high": {"raisins (tbsp)": 1}}
+            "budget": {"low": {}, "mid": {}, "high": {"raisins (tbsp)": 1}},
+            "prep_time_min": 2,
+            "instructions": [
+                "Slice apple thinly.",
+                "Serve with peanut butter. High budget: sprinkle raisins."
+            ],
+            "notes": "Check for nut allergies; use seed butter if needed."
         }
     ],
     "dinner": [
         {
             "name": "Chicken, rice & broccoli",
             "ingredients": {"chicken (g)": 70, "rice (g)": 50, "broccoli (g)": 60},
-            "budget": {"low": {}, "mid": {"soy sauce (tsp)": 1}, "high": {"sesame oil (tsp)": 0.5}}
+            "budget": {"low": {}, "mid": {"soy sauce (tsp)": 1}, "high": {"sesame oil (tsp)": 0.5}},
+            "prep_time_min": 20,
+            "instructions": [
+                "Steam or boil broccoli until tender.",
+                "Cook rice according to package.",
+                "Pan-cook diced chicken until no longer pink.",
+                "Combine on plate. Mid: soy sauce. High: sesame oil drizzle."
+            ],
+            "notes": "Shred chicken for younger kids."
         },
         {
             "name": "Mild veggie chili",
             "ingredients": {"kidney beans (g)": 80, "sweetcorn (g)": 40, "tomato passata (g)": 120, "rice (g)": 50},
-            "budget": {"low": {}, "mid": {"cheddar (tbsp)": 1}, "high": {"avocado": 0.25}}
+            "budget": {"low": {}, "mid": {"cheddar (tbsp)": 1}, "high": {"avocado": 0.25}},
+            "prep_time_min": 25,
+            "instructions": [
+                "Simmer beans, corn, and passata 10–12 minutes (no chili heat).",
+                "Cook rice separately.",
+                "Serve chili over rice. Mid: cheddar. High: sliced avocado."
+            ],
+            "notes": "Rinse canned beans to reduce sodium."
         }
     ]
 }
