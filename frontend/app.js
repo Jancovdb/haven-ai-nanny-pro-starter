@@ -215,3 +215,133 @@ document.getElementById('mp_download').onclick = async () => {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 };
+
+// ----- Meal Plan handlers -----
+function uniqueRecipeNames(plan) {
+  const set = new Set();
+  plan.forEach(d => {
+    [d.breakfast, d.lunch, d.snack, d.dinner].forEach(r => set.add(r.name));
+  });
+  return Array.from(set);
+}
+
+function renderDayPlan(plan) {
+  return plan.map(d =>
+    `Day ${d.day}
+  • Breakfast: ${d.breakfast.name}
+  • Lunch:     ${d.lunch.name}
+  • Snack:     ${d.snack.name}
+  • Dinner:    ${d.dinner.name}
+`).join("\n");
+}
+
+function renderGroceryLinks(grocery, links) {
+  const items = Object.keys(grocery).sort();
+  return items.map(k => {
+    const uses = (links[k] || []).join("; ");
+    return `- ${k}: ${grocery[k]}  ${uses ? `\n    used in → ${uses}` : ""}`;
+  }).join("\n");
+}
+
+let _lastMealPlan = null;
+
+document.getElementById('mp_generate').onclick = async () => {
+  const days = parseInt(document.getElementById('mp_days').value || "7", 10);
+  const budget = document.getElementById('mp_budget').value || "mid";
+
+  const daysView = document.getElementById('mp_days_view');
+  const groceryView = document.getElementById('mp_grocery_view');
+  const recipeSelect = document.getElementById('mp_recipe_select');
+  const recipeOut = document.getElementById('mp_recipe_out');
+
+  daysView.textContent = "Generating meal plan...";
+  groceryView.textContent = "";
+  recipeSelect.innerHTML = "";
+  recipeOut.textContent = "";
+
+  try {
+    const res = await fetch(`${API_BASE}/mealplan/generate`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ child, days, budget })
+    });
+    const data = await res.json();
+    if (!data.ok) { daysView.textContent = "Failed to generate meal plan."; return; }
+
+    _lastMealPlan = data;
+    // Render plan list
+    daysView.textContent = renderDayPlan(data.plan);
+    // Render groceries with links to recipes
+    groceryView.textContent = renderGroceryLinks(data.grocery_list, data.grocery_links);
+
+    // Build recipe selector (unique names)
+    const names = uniqueRecipeNames(data.plan);
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      recipeSelect.appendChild(opt);
+    });
+
+    // Show first recipe by default
+    if (names.length) {
+      showRecipeDetail(names[0]);
+      recipeSelect.value = names[0];
+    }
+  } catch (e) {
+    daysView.textContent = "Error generating plan.";
+  }
+};
+
+function showRecipeDetail(name) {
+  if (!_lastMealPlan) return;
+  const recipeOut = document.getElementById('mp_recipe_out');
+
+  // Find the first occurrence in the plan to pull instructions
+  let found = null;
+  _lastMealPlan.plan.some(d => {
+    for (const key of ['breakfast','lunch','snack','dinner']) {
+      const r = d[key];
+      if (r.name === name) { found = r; return true; }
+    }
+    return false;
+  });
+
+  if (!found) { recipeOut.textContent = "Recipe not found in plan."; return; }
+
+  const steps = (found.instructions || []).map((s,i)=> `${i+1}. ${s}`).join("\n");
+  const ing = Object.entries(found.ingredients || {}).map(([k,v]) => `- ${k}: ${v}`).join("\n");
+  const prep = found.prep_time_min ? `~${found.prep_time_min} min` : "n/a";
+  recipeOut.textContent =
+`Recipe: ${found.name}
+Prep time: ${prep}
+
+Ingredients:
+${ing}
+
+Steps:
+${steps}
+
+Notes:
+${found.notes || "-"}
+`;
+}
+
+document.getElementById('mp_recipe_select').onchange = (e) => {
+  showRecipeDetail(e.target.value);
+};
+
+document.getElementById('mp_download').onclick = async () => {
+  const grocery = (_lastMealPlan && _lastMealPlan.grocery_list) || {};
+  const res = await fetch(`${API_BASE}/mealplan/groceries.txt`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ grocery_list: grocery })
+  });
+  const text = await res.text();
+  const blob = new Blob([text], {type: "text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = "haven_groceries.txt";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
