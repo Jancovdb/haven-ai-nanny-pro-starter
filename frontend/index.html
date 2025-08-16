@@ -70,6 +70,20 @@
     </main>
 
 <section class="card">
+  <h2>Nap Timer</h2>
+  <div class="grid">
+    <label>Minutes <input id="napMins" type="number" value="30"/></label>
+    <button id="napStart">Start</button>
+    <button id="napStop">Stop</button>
+  </div>
+  <div id="napDisplay" style="font-size:24px;margin-top:8px;">00:30:00</div>
+  <audio id="napSound">
+    <source src="https://cdn.pixabay.com/download/audio/2021/09/09/audio_5a52e8e2b5.mp3?filename=calm-notification-2-146125.mp3" type="audio/mpeg">
+  </audio>
+  <small>Keeps time even if the tab is in the background. Make sure your volume is on.</small>
+</section>
+    
+<section class="card">
   <h2>Session Reminder</h2>
   <div class="grid">
     <label>Starts in (minutes) <input id="reminderMins" type="number" value="10"/></label>
