@@ -229,6 +229,30 @@ def mealplan_generate(req: MealPlanRequest):
 
     plan = []
     grocery: Dict[str, float] = {}
+    grocery_links: Dict[str, list] = {}  # ingredient -> [recipe labels]
+
+    def link_ingredient(ing_name: str, recipe_label: str):
+        grocery_links.setdefault(ing_name, [])
+        if recipe_label not in grocery_links[ing_name]:
+            grocery_links[ing_name].append(recipe_label)
+
+    def assemble(label_prefix: str, item: dict):
+        base = item["ingredients"]
+        extras = item["budget"].get(budget, {})
+        merged = _merge_ingredients(base, extras)
+        ing = _scale_for_age(merged, age)
+        recipe_label = f"Day {label_prefix} — {item['name']}"
+        # collect totals + link each ingredient to this recipe
+        for k, v in ing.items():
+            grocery[k] = round(grocery.get(k, 0) + v, 2)
+            link_ingredient(k, recipe_label)
+        return {
+            "name": item["name"],
+            "ingredients": ing,
+            "prep_time_min": item.get("prep_time_min"),
+            "instructions": item.get("instructions", []),
+            "notes": item.get("notes", "")
+        }
 
     for d in range(days):
         b = _pick(MEAL_DB["breakfast"], d)
@@ -236,22 +260,24 @@ def mealplan_generate(req: MealPlanRequest):
         s = _pick(MEAL_DB["snack"], d)
         dn = _pick(MEAL_DB["dinner"], d)
 
-        def assemble(item):
-            base = item["ingredients"]
-            extras = item["budget"].get(budget, {})
-            ing = _scale_for_age(_merge_ingredients(base, extras), age)
-            # collect
-            for k, v in ing.items():
-                grocery[k] = round(grocery.get(k, 0) + v, 2)
-            return {"name": item["name"], "ingredients": ing}
-
+        day_num = d + 1
         day_plan = {
-            "day": d+1,
-            "breakfast": assemble(b),
-            "lunch": assemble(l),
-            "snack": assemble(s),
-            "dinner": assemble(dn)
+            "day": day_num,
+            "breakfast": assemble(f"{day_num} Breakfast", b),
+            "lunch":     assemble(f"{day_num} Lunch",     l),
+            "snack":     assemble(f"{day_num} Snack",     s),
+            "dinner":    assemble(f"{day_num} Dinner",    dn),
         }
+        plan.append(day_plan)
+
+    return {
+        "ok": True,
+        "days": days,
+        "budget": budget,
+        "plan": plan,
+        "grocery_list": grocery,
+        "grocery_links": grocery_links  # NEW: which recipes use each ingredient
+    }
         plan.append(day_plan)
 
     return {"ok": True, "days": days, "budget": budget, "plan": plan, "grocery_list": grocery}
