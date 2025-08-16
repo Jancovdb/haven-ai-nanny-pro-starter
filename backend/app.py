@@ -169,6 +169,7 @@ def mealplan_generate(req: MealPlanRequest):
         "grocery_list": grocery,
         "grocery_links": grocery_links  # NEW: which recipes use each ingredient
     }
+    
         plan.append(day_plan)
 
     return {"ok": True, "days": days, "budget": budget, "plan": plan, "grocery_list": grocery}
