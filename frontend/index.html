@@ -14,6 +14,25 @@
 
     <main>
       <section class="card">
+  <h2>Meal Plan & Groceries</h2>
+  <div class="grid">
+    <label>Days
+      <input id="mp_days" type="number" value="7" min="1" max="14"/>
+    </label>
+    <label>Budget
+      <select id="mp_budget">
+        <option value="low">Low</option>
+        <option value="mid" selected>Mid</option>
+        <option value="high">High</option>
+      </select>
+    </label>
+    <button id="mp_generate">Generate Plan</button>
+    <button id="mp_download">Download Groceries (.txt)</button>
+  </div>
+  <pre id="mp_out"></pre>
+</section>
+      
+      <section class="card">
         <h2>Create Child Profile</h2>
         <div class="grid">
           <label>Name <input id="cname" placeholder="Child name" /></label>
