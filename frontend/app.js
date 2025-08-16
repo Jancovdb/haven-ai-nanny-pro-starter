@@ -161,3 +161,57 @@ document.getElementById('napStop').onclick = () => {
   napTimer = null; napEndTs = null;
   document.getElementById('napDisplay').textContent = "00:00:00";
 };
+
+// ----- Meal Plan handlers -----
+
+document.getElementById('mp_generate').onclick = async () => {
+  const out = document.getElementById('mp_out');
+  const days = parseInt(document.getElementById('mp_days').value || "7", 10);
+  const budget = document.getElementById('mp_budget').value || "mid";
+  out.textContent = "Generating meal plan...";
+
+  try {
+    const res = await fetch(`${API_BASE}/mealplan/generate`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ child, days, budget })
+    });
+    const data = await res.json();
+    if (!data.ok) { out.textContent = "Failed to generate meal plan."; return; }
+
+    // Pretty-print plan & groceries
+    const pretty = {
+      days: data.days,
+      budget: data.budget,
+      plan: data.plan.map(d => ({
+        day: d.day,
+        breakfast: d.breakfast.name,
+        lunch: d.lunch.name,
+        snack: d.snack.name,
+        dinner: d.dinner.name
+      })),
+      grocery_list: data.grocery_list
+    };
+    out.textContent = JSON.stringify(pretty, null, 2);
+    // stash for download
+    window._lastGroceries = data.grocery_list;
+  } catch (e) {
+    out.textContent = "Error generating plan.";
+  }
+};
+
+document.getElementById('mp_download').onclick = async () => {
+  const grocery = window._lastGroceries || {};
+  const res = await fetch(`${API_BASE}/mealplan/groceries.txt`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ grocery_list: grocery })
+  });
+  const text = await res.text();
+  const blob = new Blob([text], {type: "text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = "haven_groceries.txt";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
