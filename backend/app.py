@@ -1,3 +1,6 @@
+from collections import defaultdict
+from datetime import datetime, timezone
+import os  # if not already imported
 import json, random, datetime, os, hashlib, base64, time
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Request
@@ -73,6 +76,16 @@ def log_event(kind: str, payload: Dict[str, Any]):
     with open(DB["events_path"],"a") as f:
         f.write(json.dumps(entry)+"\n")
 
+# Ensure a writable events log path even on MVP
+if "events_path" not in DB:
+    DB["events_path"] = "data/events.jsonl"
+os.makedirs("data", exist_ok=True)
+# Create the file if it doesn't exist
+try:
+    open(DB["events_path"], "a").close()
+except Exception:
+    pass
+
 # ---------- Basic endpoints ----------
 @app.post("/signup")
 def signup(parent: Parent):
@@ -147,6 +160,47 @@ def session_start(req: SessionStartRequest):
 def metrics_timesaved():
     return {"ok": True, "minutes_saved_total": DB["time_saved_min"], "sessions": len(DB["sessions"])}
 
+@app.get("/admin/metrics/aggregate")
+def admin_metrics():
+    return {
+        "sessions": len(DB.get("sessions", [])),
+        "minutes_saved_total": DB.get("time_saved_min", 0),
+        "children": len(DB.get("children", [])),
+        "parents": len(DB.get("parents", [])),
+    }
+
+@app.get("/admin/metrics/timeseries")
+def admin_timeseries():
+    """
+    Returns daily totals of minutes saved based on recorded sessions.
+    Also parses the events log (if present) for historical sessions.
+    """
+    series = defaultdict(int)
+
+    # 1) Count current in‑memory sessions
+    for s in DB.get("sessions", []):
+        # Bucket into "today" for simplicity (MVP doesn’t timestamp sessions)
+        today = datetime.now(timezone.utc).date()
+        series[str(today)] += int(s.get("duration", 0))
+
+    # 2) Parse events log if it exists (Pro version writes 'session_start' events)
+    path = DB.get("events_path")
+    try:
+        with open(path) as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                    if obj.get("kind") == "session_start":
+                        dt = datetime.fromtimestamp(obj["ts"], tz=timezone.utc).date()
+                        series[str(dt)] += int(obj["payload"].get("duration", 0))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    items = sorted(series.items(), key=lambda x: x[0])
+    return {"ok": True, "days": [d for d,_ in items], "minutes": [m for _,m in items]}
+    
 # ---------- Calendar (.ics) ----------
 from pydantic import BaseModel
 class ICSRequest(BaseModel):
